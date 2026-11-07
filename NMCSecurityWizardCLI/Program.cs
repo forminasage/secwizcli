@@ -37,6 +37,9 @@ internal class Program
 		case Globals._ParseError.ParseErrorEmailAddress:
 			myLogger.AddEvent(Globals._LogStorage.LogError, "{0} parameter has been entered incorrectly. Please verify and retry.", "E-mail");
 			break;
+		case Globals._ParseError.ParseErrorDNSName:
+			myLogger.AddEvent(Globals._LogStorage.LogError, "{0} parameter has been entered incorrectly. Please verify and retry.", "DNS name (7 characters minimum)");
+			break;
 		case Globals._ParseError.ParseErrorCountryCode:
 			myLogger.AddEvent(Globals._LogStorage.LogError, "{0} parameter has been entered incorrectly. Please verify and retry.", "Country");
 			break;
@@ -68,10 +71,10 @@ internal class Program
 			Environment.Exit(1);
 		}
 		crypt.Init();
-		crypt.SetAttribute(-101, 107, 205);
-		crypt.SetAttribute(-101, 106, 2);
-		crypt.SetAttribute(-101, 118, 1);
-		crypt.SetAttribute(-101, 114, 5000);
+		crypt.SetAttribute(crypt.UNUSED, crypt.OPTION_ENCR_HASH, crypt.ALGO_SHA2);
+		crypt.SetAttribute(crypt.UNUSED, crypt.OPTION_ENCR_ALGO, crypt.ALGO_3DES);
+		crypt.SetAttribute(crypt.UNUSED, crypt.OPTION_CERT_COMPLIANCELEVEL, crypt.COMPLIANCELEVEL_REDUCED);
+		crypt.SetAttribute(crypt.UNUSED, crypt.OPTION_KEYING_ITERATIONS, 5000);
 		switch (argsParser.functionType)
 		{
 		case Globals._FunctionType.CreateSSLCert:
@@ -143,21 +146,21 @@ internal class Program
 
 	private static bool CreateSSLCert(Certificate cCertIn, string sCaRootCertIn)
 	{
-		int num = crypt.CreateContext(-101, 101);
-		crypt.SetAttribute(num, 1005, cCertIn.GetKeySize() / 8);
-		crypt.SetAttributeString(num, 1016, Encoding.ASCII.GetBytes("Private key"), 0, 11);
+		int num = crypt.CreateContext(crypt.UNUSED, crypt.ALGO_RSA);
+		crypt.SetAttribute(num, crypt.CTXINFO_KEYSIZE, cCertIn.GetKeySize() / 8);
+		crypt.SetAttributeString(num, crypt.CTXINFO_LABEL, Encoding.ASCII.GetBytes("Private key"), 0, 11);
 		crypt.GenerateKey(num);
-		int keyset = crypt.KeysetOpen(-101, 1, cCertIn.GetFileName() + ".p15", 2);
+		int keyset = crypt.KeysetOpen(crypt.UNUSED, crypt.KEYSET_FILE, cCertIn.GetFileName() + ".p15", crypt.KEYOPT_CREATE);
 		crypt.AddPrivateKey(keyset, num, "user");
-		int num2 = crypt.CreateCert(-101, 4);
-		crypt.SetAttribute(num2, 2014, num);
+		int num2 = crypt.CreateCert(crypt.UNUSED, crypt.CERTTYPE_CERTREQUEST);
+		crypt.SetAttribute(num2, crypt.CERTINFO_SUBJECTPUBLICKEYINFO, num);
 		SetDNAttributes(num2, cCertIn, bUseValidity: false);
 		SetSANAttributes(num2, cCertIn);
 		crypt.SignCert(num2, num);
 		int keyset2;
 		try
 		{
-			keyset2 = crypt.KeysetOpen(-101, 1, sCaRootCertIn + ".p15", 1);
+			keyset2 = crypt.KeysetOpen(crypt.UNUSED, crypt.KEYSET_FILE, sCaRootCertIn + ".p15", crypt.KEYOPT_READONLY);
 		}
 		catch (CryptException)
 		{
@@ -167,20 +170,20 @@ internal class Program
 			File.Delete(cCertIn.GetFileName() + ".p15");
 			return false;
 		}
-		int privateKey = crypt.GetPrivateKey(keyset2, 1, "Private key", "root");
+		int privateKey = crypt.GetPrivateKey(keyset2, crypt.KEYID_NAME, "Private key", "root");
 		crypt.KeysetClose(keyset2);
-		int num3 = crypt.CreateCert(-101, 1);
-		crypt.SetAttribute(num3, 2023, num2);
+		int num3 = crypt.CreateCert(crypt.UNUSED, crypt.CERTTYPE_CERTIFICATE);
+		crypt.SetAttribute(num3, crypt.CERTINFO_CERTREQUEST, num2);
 		if (cCertIn.GetValidityPeriodStart() != 0 && cCertIn.GetValidityPeriodEnd() != 0)
 		{
-			crypt.SetAttributeString(num3, 2018, BitConverter.GetBytes((int)cCertIn.GetValidityPeriodStart()));
-			crypt.SetAttributeString(num3, 2019, BitConverter.GetBytes((int)cCertIn.GetValidityPeriodEnd()));
+			crypt.SetAttributeString(num3, crypt.CERTINFO_VALIDFROM, BitConverter.GetBytes(cCertIn.GetValidityPeriodStart()));
+			crypt.SetAttributeString(num3, crypt.CERTINFO_VALIDTO, BitConverter.GetBytes(cCertIn.GetValidityPeriodEnd()));
 		}
 		crypt.SignCert(num3, privateKey);
 		crypt.AddPublicKey(keyset, num3);
-		int num4 = crypt.ExportCert(null, 0, 1, num3);
+		int num4 = crypt.ExportCert(null, 0, crypt.CERTFORMAT_CERTIFICATE, num3);
 		byte[] array = new byte[num4];
-		crypt.ExportCert(array, array.Length, 1, num3);
+		crypt.ExportCert(array, array.Length, crypt.CERTFORMAT_CERTIFICATE, num3);
 		DisplayCertificateSummary(num3);
 		File.WriteAllBytes(cCertIn.GetFileName() + ".crt", array);
 		crypt.KeysetClose(keyset);
@@ -194,22 +197,22 @@ internal class Program
 
 	private static bool GenerateCSR(Certificate cCertIn)
 	{
-		int num = crypt.CreateContext(-101, 101);
-		crypt.SetAttribute(num, 1005, cCertIn.GetKeySize() / 8);
-		crypt.SetAttributeString(num, 1016, Encoding.ASCII.GetBytes("Private key"), 0, 11);
+		int num = crypt.CreateContext(crypt.UNUSED, crypt.ALGO_RSA);
+		crypt.SetAttribute(num, crypt.CTXINFO_KEYSIZE, cCertIn.GetKeySize() / 8);
+		crypt.SetAttributeString(num, crypt.CTXINFO_LABEL, Encoding.ASCII.GetBytes("Private key"), 0, 11);
 		crypt.GenerateKey(num);
-		int keyset = crypt.KeysetOpen(-101, 1, cCertIn.GetFileName() + ".p15", 2);
+		int keyset = crypt.KeysetOpen(crypt.UNUSED, crypt.KEYSET_FILE, cCertIn.GetFileName() + ".p15", crypt.KEYOPT_CREATE);
 		crypt.AddPrivateKey(keyset, num, "user");
 		crypt.KeysetClose(keyset);
-		int num2 = crypt.CreateCert(-101, 4);
-		crypt.SetAttribute(num2, 2014, num);
+		int num2 = crypt.CreateCert(crypt.UNUSED, crypt.CERTTYPE_CERTREQUEST);
+		crypt.SetAttribute(num2, crypt.CERTINFO_SUBJECTPUBLICKEYINFO, num);
 		SetDNAttributes(num2, cCertIn, bUseValidity: false);
 		SetSANAttributes(num2, cCertIn);
 		crypt.SignCert(num2, num);
 		crypt.DestroyContext(num);
-		int num3 = crypt.ExportCert(null, 0, 3, num2);
+		int num3 = crypt.ExportCert(null, 0, crypt.CERTFORMAT_TEXT_CERTIFICATE, num2);
 		byte[] array = new byte[num3 + 1];
-		crypt.ExportCert(array, array.Length, 3, num2);
+		crypt.ExportCert(array, array.Length, crypt.CERTFORMAT_TEXT_CERTIFICATE, num2);
 		crypt.DestroyCert(num2);
 		File.WriteAllBytes(cCertIn.GetFileName() + ".csr", array);
 		return true;
@@ -217,11 +220,11 @@ internal class Program
 
 	private static bool CreateSSHServerHostKey(string sOutFile, int sKeySize)
 	{
-		int num = crypt.CreateContext(-101, 101);
-		crypt.SetAttribute(num, 1005, sKeySize / 8);
-		crypt.SetAttributeString(num, 1016, Encoding.ASCII.GetBytes("Private key"), 0, 11);
+		int num = crypt.CreateContext(crypt.UNUSED, crypt.ALGO_RSA);
+		crypt.SetAttribute(num, crypt.CTXINFO_KEYSIZE, sKeySize / 8);
+		crypt.SetAttributeString(num, crypt.CTXINFO_LABEL, Encoding.ASCII.GetBytes("Private key"), 0, 11);
 		crypt.GenerateKey(num);
-		int keyset = crypt.KeysetOpen(-101, 1, sOutFile + ".p15", 2);
+		int keyset = crypt.KeysetOpen(crypt.UNUSED, crypt.KEYSET_FILE, sOutFile + ".p15", crypt.KEYOPT_CREATE);
 		crypt.AddPrivateKey(keyset, num, "user");
 		crypt.KeysetClose(keyset);
 		crypt.DestroyContext(num);
@@ -231,28 +234,28 @@ internal class Program
 
 	private static bool CreateCARootCert(Certificate cCertIn)
 	{
-		int num = crypt.CreateContext(-101, 101);
-		crypt.SetAttribute(num, 1005, cCertIn.GetKeySize() / 8);
-		crypt.SetAttributeString(num, 1016, Encoding.ASCII.GetBytes("Private key"), 0, 11);
+		int num = crypt.CreateContext(crypt.UNUSED, crypt.ALGO_RSA);
+		crypt.SetAttribute(num, crypt.CTXINFO_KEYSIZE, cCertIn.GetKeySize() / 8);
+		crypt.SetAttributeString(num, crypt.CTXINFO_LABEL, Encoding.ASCII.GetBytes("Private key"), 0, 11);
 		crypt.GenerateKey(num);
-		int keyset = crypt.KeysetOpen(-101, 1, cCertIn.GetFileName() + ".p15", 2);
+		int keyset = crypt.KeysetOpen(crypt.UNUSED, crypt.KEYSET_FILE, cCertIn.GetFileName() + ".p15", crypt.KEYOPT_CREATE);
 		crypt.AddPrivateKey(keyset, num, "root");
 		crypt.KeysetClose(keyset);
-		int num2 = crypt.CreateCert(-101, 1);
-		crypt.SetAttribute(num2, 2014, num);
+		int num2 = crypt.CreateCert(crypt.UNUSED, crypt.CERTTYPE_CERTIFICATE);
+		crypt.SetAttribute(num2, crypt.CERTINFO_SUBJECTPUBLICKEYINFO, num);
 		SetDNAttributes(num2, cCertIn, bUseValidity: true);
 		SetSANAttributes(num2, cCertIn);
-		crypt.SetAttribute(num2, 2001, 1);
-		crypt.SetAttribute(num2, 2266, 96);
-		crypt.SetAttribute(num2, 2273, 1);
+		crypt.SetAttribute(num2, crypt.CERTINFO_SELFSIGNED, 1);
+		crypt.SetAttribute(num2, crypt.CERTINFO_KEYUSAGE, crypt.KEYUSAGE_KEYCERTSIGN | crypt.KEYUSAGE_CRLSIGN);
+		crypt.SetAttribute(num2, crypt.CERTINFO_CA, 1);
 		crypt.SignCert(num2, num);
 		crypt.DestroyContext(num);
-		keyset = crypt.KeysetOpen(-101, 1, cCertIn.GetFileName() + ".p15", 0);
+		keyset = crypt.KeysetOpen(crypt.UNUSED, crypt.KEYSET_FILE, cCertIn.GetFileName() + ".p15", crypt.KEYOPT_NONE);
 		crypt.AddPublicKey(keyset, num2);
 		crypt.KeysetClose(keyset);
-		int num3 = crypt.ExportCert(null, 0, 1, num2);
+		int num3 = crypt.ExportCert(null, 0, crypt.CERTFORMAT_CERTIFICATE, num2);
 		byte[] array = new byte[num3];
-		crypt.ExportCert(array, array.Length, 1, num2);
+		crypt.ExportCert(array, array.Length, crypt.CERTFORMAT_CERTIFICATE, num2);
 		File.WriteAllBytes(cCertIn.GetFileName() + ".crt", array);
 		DisplayCertificateSummary(num2);
 		crypt.DestroyCert(num2);
@@ -263,8 +266,8 @@ internal class Program
 	{
 		File.WriteAllBytes(sOutFile + ".p15", File.ReadAllBytes(sKeyFile + ".p15"));
 		byte[] certObject = File.ReadAllBytes(sCertFile);
-		int num = crypt.ImportCert(certObject, -101);
-		int keyset = crypt.KeysetOpen(-101, 1, sOutFile + ".p15", 0);
+		int num = crypt.ImportCert(certObject, crypt.UNUSED);
+		int keyset = crypt.KeysetOpen(crypt.UNUSED, crypt.KEYSET_FILE, sOutFile + ".p15", crypt.KEYOPT_NONE);
 		crypt.AddPublicKey(keyset, num);
 		crypt.KeysetClose(keyset);
 		DisplayCertificateSummary(num);
@@ -275,50 +278,51 @@ internal class Program
 
 	private static void SetDNAttributes(int certRequest, Certificate cCert, bool bUseValidity)
 	{
-		crypt.SetAttributeString(certRequest, 2105, cCert.GetCommonName());
-		crypt.SetAttributeString(certRequest, 2100, cCert.GetCountry());
+		crypt.SetAttributeString(certRequest, crypt.CERTINFO_COMMONNAME, cCert.GetCommonName());
+		crypt.SetAttributeString(certRequest, crypt.CERTINFO_COUNTRYNAME, cCert.GetCountry());
 		if (cCert.GetStateOrProvince() != null)
 		{
-			crypt.SetAttributeString(certRequest, 2101, cCert.GetStateOrProvince());
+			crypt.SetAttributeString(certRequest, crypt.CERTINFO_STATEORPROVINCENAME, cCert.GetStateOrProvince());
 		}
 		if (cCert.GetLocality() != null)
 		{
-			crypt.SetAttributeString(certRequest, 2102, cCert.GetLocality());
+			crypt.SetAttributeString(certRequest, crypt.CERTINFO_LOCALITYNAME, cCert.GetLocality());
 		}
 		if (cCert.GetOrganization() != null)
 		{
-			crypt.SetAttributeString(certRequest, 2103, cCert.GetOrganization());
+			crypt.SetAttributeString(certRequest, crypt.CERTINFO_ORGANIZATIONNAME, cCert.GetOrganization());
 		}
 		if (cCert.GetOrganizationalUnit() != null)
 		{
-			crypt.SetAttributeString(certRequest, 2104, cCert.GetOrganizationalUnit());
+			crypt.SetAttributeString(certRequest, crypt.CERTINFO_ORGANIZATIONALUNITNAME, cCert.GetOrganizationalUnit());
 		}
 		if (bUseValidity && cCert.GetValidityPeriodStart() != 0 && cCert.GetValidityPeriodEnd() != 0)
 		{
-			crypt.SetAttributeString(certRequest, 2018, BitConverter.GetBytes((int)cCert.GetValidityPeriodStart()));
-			crypt.SetAttributeString(certRequest, 2019, BitConverter.GetBytes((int)cCert.GetValidityPeriodEnd()));
+			crypt.SetAttributeString(certRequest, crypt.CERTINFO_VALIDFROM, BitConverter.GetBytes(cCert.GetValidityPeriodStart()));
+			crypt.SetAttributeString(certRequest, crypt.CERTINFO_VALIDTO, BitConverter.GetBytes(cCert.GetValidityPeriodEnd()));
 		}
 	}
 
 	private static void SetSANAttributes(int certRequest, Certificate cCert)
 	{
-		crypt.SetAttribute(certRequest, 14, 2270);
+		// GeneralName fields default to subjectAltName. Selecting it explicitly makes
+		// cryptlib 3.4.9.6 fail with an internal error on the third entry added.
 		if (cCert.GetContactEmailAddress() != null)
 		{
-			crypt.SetAttributeString(certRequest, 2108, cCert.GetContactEmailAddress());
+			crypt.SetAttributeString(certRequest, crypt.CERTINFO_RFC822NAME, cCert.GetContactEmailAddress());
 		}
 		foreach (string dnsName in cCert.GetDNSName())
 		{
-			crypt.SetAttributeString(certRequest, 2109, dnsName);
+			crypt.SetAttributeString(certRequest, crypt.CERTINFO_DNSNAME, dnsName);
 		}
 		if (cCert.GetURIName() != null)
 		{
-			crypt.SetAttributeString(certRequest, 2113, cCert.GetURIName());
+			crypt.SetAttributeString(certRequest, crypt.CERTINFO_UNIFORMRESOURCEIDENTIFIER, cCert.GetURIName());
 		}
 		if (cCert.GetIPAddress() != null)
 		{
 			byte[] addressBytes = IPAddress.Parse(cCert.GetIPAddress()).GetAddressBytes();
-			crypt.SetAttributeString(certRequest, 2114, addressBytes);
+			crypt.SetAttributeString(certRequest, crypt.CERTINFO_IPADDRESS, addressBytes);
 		}
 	}
 
@@ -354,15 +358,15 @@ internal class Program
 
 	private static void DisplayCertificateSummary(int iContextIn)
 	{
-		crypt.SetAttribute(iContextIn, 14, 2017);
+		crypt.SetAttribute(iContextIn, crypt.ATTRIBUTE_CURRENT, crypt.CERTINFO_ISSUERNAME);
 		Console.WriteLine("Certificate's Issuer Information:");
 		DisplayCertificateElements(iContextIn, Globals._CertificateGroup.GroupIssuer);
 		Console.WriteLine("");
-		crypt.SetAttribute(iContextIn, 14, 2020);
+		crypt.SetAttribute(iContextIn, crypt.ATTRIBUTE_CURRENT, crypt.CERTINFO_SUBJECTNAME);
 		Console.WriteLine("Certificate's Subject Information:");
 		DisplayCertificateElements(iContextIn, Globals._CertificateGroup.GroupSubject);
 		Console.WriteLine("");
-		crypt.SetAttribute(iContextIn, 14, 2020);
+		crypt.SetAttribute(iContextIn, crypt.ATTRIBUTE_CURRENT, crypt.CERTINFO_SUBJECTNAME);
 		Console.WriteLine("Certificate's General Information:");
 		DisplayCertificateElements(iContextIn, Globals._CertificateGroup.GroupGeneral);
 		Console.WriteLine("");
@@ -377,42 +381,42 @@ internal class Program
 		case Globals._CertificateGroup.GroupSubject:
 			try
 			{
-				Console.WriteLine("  Common Name: " + crypt.GetAttributeString(iContextIn, 2105));
+				Console.WriteLine("  Common Name: " + crypt.GetAttributeString(iContextIn, crypt.CERTINFO_COMMONNAME));
 			}
 			catch (CryptException)
 			{
 			}
 			try
 			{
-				Console.WriteLine("  Country: " + crypt.GetAttributeString(iContextIn, 2100));
+				Console.WriteLine("  Country: " + crypt.GetAttributeString(iContextIn, crypt.CERTINFO_COUNTRYNAME));
 			}
 			catch (CryptException)
 			{
 			}
 			try
 			{
-				Console.WriteLine("  State/Province: " + crypt.GetAttributeString(iContextIn, 2101));
+				Console.WriteLine("  State/Province: " + crypt.GetAttributeString(iContextIn, crypt.CERTINFO_STATEORPROVINCENAME));
 			}
 			catch (CryptException)
 			{
 			}
 			try
 			{
-				Console.WriteLine("  Locality: " + crypt.GetAttributeString(iContextIn, 2102));
+				Console.WriteLine("  Locality: " + crypt.GetAttributeString(iContextIn, crypt.CERTINFO_LOCALITYNAME));
 			}
 			catch (CryptException)
 			{
 			}
 			try
 			{
-				Console.WriteLine("  Organization: " + crypt.GetAttributeString(iContextIn, 2103));
+				Console.WriteLine("  Organization: " + crypt.GetAttributeString(iContextIn, crypt.CERTINFO_ORGANIZATIONNAME));
 			}
 			catch (CryptException)
 			{
 			}
 			try
 			{
-				Console.WriteLine("  Organizational Unit: " + crypt.GetAttributeString(iContextIn, 2104));
+				Console.WriteLine("  Organizational Unit: " + crypt.GetAttributeString(iContextIn, crypt.CERTINFO_ORGANIZATIONALUNITNAME));
 			}
 			catch (CryptException)
 			{
@@ -421,34 +425,34 @@ internal class Program
 			{
 				try
 				{
-					num = crypt.GetAttributeString(iContextIn, 2018, null);
+					num = crypt.GetAttributeString(iContextIn, crypt.CERTINFO_VALIDFROM, null);
 					byte[] value = new byte[num];
-					crypt.GetAttributeString(iContextIn, 2018, value);
-					Console.WriteLine("  Valid From: " + Globals.ConvertSecondsToTimeStamp(BitConverter.ToInt32(value, 0)) + " (GMT)");
+					crypt.GetAttributeString(iContextIn, crypt.CERTINFO_VALIDFROM, value);
+					Console.WriteLine("  Valid From: " + Globals.ConvertSecondsToTimeStamp(BitConverter.ToInt64(value, 0)) + " (GMT)");
 				}
 				catch (CryptException)
 				{
 				}
 				try
 				{
-					num = crypt.GetAttributeString(iContextIn, 2019, null);
+					num = crypt.GetAttributeString(iContextIn, crypt.CERTINFO_VALIDTO, null);
 					byte[] value2 = new byte[num];
-					crypt.GetAttributeString(iContextIn, 2019, value2);
-					Console.WriteLine("  Valid To: " + Globals.ConvertSecondsToTimeStamp(BitConverter.ToInt32(value2, 0)) + " (GMT)");
+					crypt.GetAttributeString(iContextIn, crypt.CERTINFO_VALIDTO, value2);
+					Console.WriteLine("  Valid To: " + Globals.ConvertSecondsToTimeStamp(BitConverter.ToInt64(value2, 0)) + " (GMT)");
 				}
 				catch (CryptException)
 				{
 				}
 				try
 				{
-					Console.WriteLine("  E-Mail Address: " + crypt.GetAttributeString(iContextIn, 2108));
+					Console.WriteLine("  E-Mail Address: " + crypt.GetAttributeString(iContextIn, crypt.CERTINFO_RFC822NAME));
 				}
 				catch (CryptException)
 				{
 				}
 				try
 				{
-					Console.WriteLine("  URI Name: " + crypt.GetAttributeString(iContextIn, 2113));
+					Console.WriteLine("  URI Name: " + crypt.GetAttributeString(iContextIn, crypt.CERTINFO_UNIFORMRESOURCEIDENTIFIER));
 				}
 				catch (CryptException)
 				{
@@ -456,7 +460,7 @@ internal class Program
 				try
 				{
 					byte[] array3 = new byte[4];
-					crypt.GetAttributeString(iContextIn, 2114, array3);
+					crypt.GetAttributeString(iContextIn, crypt.CERTINFO_IPADDRESS, array3);
 					Console.WriteLine("  IP Address: " + new IPAddress(array3).ToString());
 				}
 				catch (CryptException)
@@ -465,7 +469,7 @@ internal class Program
 				try
 				{
 					crypt.SetAttribute(iContextIn, crypt.ATTRIBUTE_CURRENT, crypt.CERTINFO_SUBJECTALTNAME);
-					crypt.SetAttribute(iContextIn, crypt.ATTRIBUTE_CURRENT, crypt.CERTINFO_DNSNAME);
+					crypt.SetAttribute(iContextIn, crypt.ATTRIBUTE_CURRENT_INSTANCE, crypt.CERTINFO_DNSNAME);
 					// Stepping past the last instance throws, which ends the loop.
 					while (true)
 					{
@@ -482,9 +486,9 @@ internal class Program
 		case Globals._CertificateGroup.GroupGeneral:
 			try
 			{
-				num = crypt.GetAttributeString(iContextIn, 2013, null);
+				num = crypt.GetAttributeString(iContextIn, crypt.CERTINFO_SERIALNUMBER, null);
 				byte[] array = new byte[num];
-				crypt.GetAttributeString(iContextIn, 2013, array);
+				crypt.GetAttributeString(iContextIn, crypt.CERTINFO_SERIALNUMBER, array);
 				Console.WriteLine("  Serial Number: " + BitConverter.ToString(array).Replace("-", ":"));
 			}
 			catch (CryptException)
@@ -492,9 +496,9 @@ internal class Program
 			}
 			try
 			{
-				num = crypt.GetAttributeString(iContextIn, 2005, null);
+				num = crypt.GetAttributeString(iContextIn, crypt.CERTINFO_FINGERPRINT_SHA1, null);
 				byte[] array2 = new byte[num];
-				crypt.GetAttributeString(iContextIn, 2005, array2);
+				crypt.GetAttributeString(iContextIn, crypt.CERTINFO_FINGERPRINT_SHA1, array2);
 				Console.WriteLine("  SHA1 Thumbprint: " + BitConverter.ToString(array2).Replace("-", ":"));
 				break;
 			}
@@ -508,7 +512,7 @@ internal class Program
 	private static void DisplaySplashHeader()
 	{
 		Console.WriteLine("");
-		Console.WriteLine("NMC Security Wizard Command Line Utility v1.0.5");
+		Console.WriteLine("NMC Security Wizard Command Line Utility v1.0.6");
 		Console.WriteLine("(c) Copyright 2018 Schneider Electric. All rights reserved.");
 		Console.WriteLine("-----------------------------------------------------------------------------");
 	}

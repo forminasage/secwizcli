@@ -118,7 +118,8 @@ internal class ArgsParser
 				{
 					return Globals._ParseError.ParseErrorArgumentMismatch;
 				}
-				catch (FormatException)
+				// cryptlib 3.4.9.6 applies its email address minimum (7) to DNS names.
+				if (dnsNameSAN[dnsNameSAN.Count - 1].Length < 7)
 				{
 					return Globals._ParseError.ParseErrorDNSName;
 				}

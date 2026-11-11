@@ -22,9 +22,9 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Build cl32.dll
-        shell: bash
         run: |
           git -C cl apply ../cryptlib/nmc-p15.patch
+          if ($LASTEXITCODE) { exit 1 }
           msbuild cl/crypt32.vcxproj -m -p:Configuration=Release -p:Platform=Win32 -p:PlatformToolset=v143
 
       - name: Build tool

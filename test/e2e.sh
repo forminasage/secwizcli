@@ -42,6 +42,10 @@ out=$(tool --import -o imp -s signed.crt -p req)
 tool --sshkey -o ssh >/dev/null
 [ -s ssh.p15 ] || fail "SSH key not written"
 
+for f in srv.p15 imp.p15 ssh.p15; do
+	dotnet run "$here/p15check/p15check.cs" -- "$f" >/dev/null || fail "$f is not in the NMC key format"
+done
+
 out=$(tool --csr -o short -n ups01.corp.com -c US -d ups01 || true)
 grep -q 'DNS name (7 characters minimum)' <<<"$out" || fail "short DNS name not rejected cleanly"
 

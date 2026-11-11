@@ -1,0 +1,58 @@
+name: windows
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2025
+    steps:
+      # Keep LF endings so nmc-p15.patch applies to the cryptlib checkout.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: cryptlib/cryptlib
+          ref: v3.4.9.6
+          path: cl
+      - uses: microsoft/setup-msbuild@v2
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build cl32.dll
+        shell: bash
+        run: |
+          git -C cl apply ../cryptlib/nmc-p15.patch
+          msbuild cl/crypt32.vcxproj -m -p:Configuration=Release -p:Platform=Win32 -p:PlatformToolset=v143
+
+      - name: Build tool
+        run: dotnet build NMCSecurityWizardCLI.csproj -c Release -o out
+
+      - name: Smoke test
+        shell: bash
+        env:
+          # Runs the .NET 2.0 exe on the runner's CLR 4.
+          COMPlus_OnlyUseLatestCLR: "1"
+        run: |
+          set -euo pipefail
+          cp cl/binaries32_vs/cl32.dll cryptlib/COPYING out/
+          mkdir work && cd work && cp ../out/cl32.dll .
+          tool() { ../out/NMCSecurityWizardCLI.exe "$@"; }
+          tool --caroot -o ca -n ca.corp.com -c US -f 01/01/2026 -t 01/01/2036
+          tool --sslcert -o srv -r ca -n ups01.corp.com -c US -f 01/01/2026 -t 01/01/2028 \
+            -d ups01.corp.com -d ups01.lan -d ups01.mgmt.corp.com
+          tool --sshkey -o ssh
+          sans=$(openssl x509 -in srv.crt -noout -ext subjectAltName)
+          echo "$sans"
+          [ "$(grep -o 'DNS:' <<<"$sans" | wc -l)" -eq 3 ]
+          for f in srv.p15 ssh.p15; do dotnet run ../test/p15check/p15check.cs -- "$f"; done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NMCSecurityWizardCLI
+          path: |
+            out/NMCSecurityWizardCLI.exe
+            out/cl32.dll
+            out/COPYING

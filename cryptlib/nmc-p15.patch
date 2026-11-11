@@ -1,0 +1,49 @@
+diff --git a/keyset/pkcs15_addpriv.c b/keyset/pkcs15_addpriv.c
+index 3168dee..79e9f5d 100644
+--- a/keyset/pkcs15_addpriv.c
++++ b/keyset/pkcs15_addpriv.c
+@@ -28,7 +28,7 @@
+ 
+ /* Define the following to write pre-PKCS #15 v1.3 private-key records */
+ 
+-/* #define USE_NONEXT_FORMAT */
++#define USE_NONEXT_FORMAT
+ 
+ /* The minimum number of keying iterations to use when deriving a key wrap
+    key from a password.  We have to be careful here not to exceed the kernel-
+@@ -38,7 +38,7 @@
+ #if defined( CONFIG_SLOW_CPU )
+   #define MIN_KEYING_ITERATIONS	1000
+ #elif defined( CONFIG_FAST_CPU )
+-  #define MIN_KEYING_ITERATIONS	50000
++  #define MIN_KEYING_ITERATIONS	5000
+ #else
+   #define MIN_KEYING_ITERATIONS	10000
+ #endif /* CONFIG_SLOW_CPU */
+@@ -392,7 +392,7 @@ static int createContexts( OUT_HANDLE_OPT CRYPT_CONTEXT *iGenericSecret,
+ 	   from the generic-secret context */
+ 	status = createStrongAlgorithmContext( iCryptContext, iCryptOwner,
+ 										   *iGenericSecret, 
+-										   CRYPT_ALGO_HMAC_SHA2, TRUE );
++										   CRYPT_ALGO_HMAC_SHA1, TRUE );
+ 	if( cryptStatusError( status ) )
+ 		{
+ 		krnlSendNotifier( *iGenericSecret, IMESSAGE_DECREFCOUNT );
+@@ -401,7 +401,7 @@ static int createContexts( OUT_HANDLE_OPT CRYPT_CONTEXT *iGenericSecret,
+ 		}
+ 	status = createStrongAlgorithmContext( iMacContext, iCryptOwner,
+ 										   *iGenericSecret, 
+-										   CRYPT_ALGO_HMAC_SHA2, FALSE );
++										   CRYPT_ALGO_HMAC_SHA1, FALSE );
+ 	if( cryptStatusError( status ) )
+ 		{
+ 		krnlSendNotifier( *iGenericSecret, IMESSAGE_DECREFCOUNT );
+@@ -413,7 +413,7 @@ static int createContexts( OUT_HANDLE_OPT CRYPT_CONTEXT *iGenericSecret,
+ 	/* Send the algorithm parameters for the encryption and MAC contexts to
+ 	   the generic-secret context */
+ 	status = setGenericSecretParams( *iGenericSecret, *iCryptContext, 
+-									 *iMacContext, CRYPT_ALGO_HMAC_SHA2 );
++									 *iMacContext, CRYPT_ALGO_HMAC_SHA1 );
+ 	if( cryptStatusError( status ) )
+ 		{
+ 		krnlSendNotifier( *iGenericSecret, IMESSAGE_DECREFCOUNT );

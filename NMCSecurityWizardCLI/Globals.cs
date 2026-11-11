@@ -57,7 +57,7 @@ public static class Globals
 		ParseErrorSignedCertDoesNotExist
 	}
 
-	public const string _appVersionIdentifier = "1.0.6";
+	public const string _appVersionIdentifier = "1.0.7";
 
 	public const string _appNameIdentifier = "NMCSecurityWizardCLI100";
 

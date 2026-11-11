@@ -512,7 +512,7 @@ internal class Program
 	private static void DisplaySplashHeader()
 	{
 		Console.WriteLine("");
-		Console.WriteLine("NMC Security Wizard Command Line Utility v1.0.6");
+		Console.WriteLine("NMC Security Wizard Command Line Utility v1.0.7");
 		Console.WriteLine("(c) Copyright 2018 Schneider Electric. All rights reserved.");
 		Console.WriteLine("-----------------------------------------------------------------------------");
 	}

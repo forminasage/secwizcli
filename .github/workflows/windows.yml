@@ -11,24 +11,26 @@ jobs:
       # Keep LF endings so nmc-p15.patch applies to the cryptlib checkout.
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Before the cryptlib checkout, whose bindings the SDK would otherwise compile.
+      - name: Build tool
+        run: dotnet build NMCSecurityWizardCLI.csproj -c Release -o out
+
       - uses: actions/checkout@v4
         with:
           repository: cryptlib/cryptlib
           ref: v3.4.9.6
           path: cl
       - uses: microsoft/setup-msbuild@v2
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
 
       - name: Build cl32.dll
         run: |
           git -C cl apply ../cryptlib/nmc-p15.patch
           if ($LASTEXITCODE) { exit 1 }
           msbuild cl/crypt32.vcxproj -m -p:Configuration=Release -p:Platform=Win32 -p:PlatformToolset=v143
-
-      - name: Build tool
-        run: dotnet build NMCSecurityWizardCLI.csproj -c Release -o out
 
       - name: Smoke test
         shell: bash
